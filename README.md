@@ -9,6 +9,7 @@ This project creates a serverless Line Bot webhook using AWS Lambda with API Gat
 - **API Gateway with Lambda Authorizer**: Provides secure HTTPS endpoint with custom authorization
 - **AWS Secrets Manager**: Securely stores Line Bot credentials
 - **Line Bot SDK**: Handles Line Message API interactions
+- **Amazon S3**: Stores files uploaded through the Line Bot
 
 ## Prerequisites
 
@@ -31,12 +32,18 @@ This project creates a serverless Line Bot webhook using AWS Lambda with API Gat
 
 3. Deploy the stack:
    ```
+   # To create a new S3 bucket automatically:
    cdk deploy
+   
+   # To use an existing S3 bucket:
+   cdk deploy -c bucket_name=your-existing-bucket-name
    ```
 
-4. After deployment, you'll receive two outputs:
+4. After deployment, you'll receive three outputs:
    - `LineBotWebhookUrl`: The URL to set as webhook URL in Line Developer Console
    - `SetupInstructions`: Instructions for setting up Line Bot credentials
+   - `FileUploadBucketName`: The name of the S3 bucket used for file uploads
+   - `BucketInfo`: Information about whether a new bucket was created or an existing one was used
 
 5. Update the secret in AWS Secrets Manager with your Line Bot credentials:
    - Go to AWS Secrets Manager console
@@ -74,9 +81,18 @@ Benefits of using Lambda Layers:
 - Makes function code updates faster
 - Allows sharing dependencies across multiple functions
 
+## S3 Bucket Options
+
+You have two options for the S3 bucket used to store files uploaded through the Line Bot:
+
+1. **Create a new bucket**: By default, the stack will create a new S3 bucket with appropriate security settings.
+2. **Use an existing bucket**: You can specify an existing bucket name using the CDK context parameter `bucket_name`.
+
+When using an existing bucket, make sure it has appropriate permissions and security settings.
+
 ## Customization
 
-To customize the bot's behavior, modify the `lambda/app.py` file. The current implementation is a simple echo bot that replies with the received message.
+To customize the bot's behavior, modify the `lambda/app.py` file. The current implementation is a simple echo bot that replies with the received message and handles file uploads.
 
 ## Cleanup
 
@@ -85,3 +101,5 @@ To remove all resources created by this stack:
 ```
 cdk destroy
 ```
+
+Note: If you used the default configuration, the S3 bucket will be retained even after stack deletion to prevent accidental data loss. You'll need to delete it manually if desired.

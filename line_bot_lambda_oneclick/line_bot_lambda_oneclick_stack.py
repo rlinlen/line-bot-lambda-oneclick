@@ -17,6 +17,9 @@ class LineBotLambdaOneclickStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        # Get existing bucket name from context if provided
+        existing_bucket_name = self.node.try_get_context('bucket_name')
+
         # Create a secret for Line Bot credentials
         line_bot_secret = secretsmanager.Secret(
             self, "LineBotCredentials",
@@ -43,15 +46,43 @@ class LineBotLambdaOneclickStack(Stack):
             description="Layer containing Line Bot SDK and dependencies",
         )
 
-        # Create S3 bucket for file uploads
-        file_upload_bucket = s3.Bucket(
-            self, "LineBotFileUploadBucket",
-            removal_policy=RemovalPolicy.RETAIN,  # Keep the bucket when stack is deleted
-            encryption=s3.BucketEncryption.S3_MANAGED,  # Enable encryption
-            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,  # Block public access
-            enforce_ssl=True  # Enforce SSL
-        )
+        # Initialize file_upload_bucket variable
+        file_upload_bucket = None
+        bucket_name = ""
         
+        if existing_bucket_name and existing_bucket_name.strip():
+            # Use existing bucket if name is provided in context
+            file_upload_bucket = s3.Bucket.from_bucket_name(
+                self, "ImportedBucket", 
+                existing_bucket_name.strip()
+            )
+            bucket_name = existing_bucket_name.strip()
+            
+            # Output that we're using an existing bucket
+            CfnOutput(
+                self, "BucketInfo",
+                value=f"Using existing bucket: {bucket_name}",
+                description="S3 bucket information"
+            )
+        else:
+            # Create a new S3 bucket for file uploads if no existing bucket name is provided
+            new_bucket = s3.Bucket(
+                self, "LineBotFileUploadBucket",
+                removal_policy=RemovalPolicy.RETAIN,  # Keep the bucket when stack is deleted
+                encryption=s3.BucketEncryption.S3_MANAGED,  # Enable encryption
+                block_public_access=s3.BlockPublicAccess.BLOCK_ALL,  # Block public access
+                enforce_ssl=True  # Enforce SSL
+            )
+            file_upload_bucket = new_bucket
+            bucket_name = new_bucket.bucket_name
+            
+            # Output that we created a new bucket
+            CfnOutput(
+                self, "BucketInfo",
+                value=f"Created new bucket: {bucket_name}",
+                description="S3 bucket information"
+            )
+
         # Create Lambda function for Line Bot webhook
         line_bot_lambda = _lambda.Function(
             self, "LineBotFunction",
@@ -62,7 +93,7 @@ class LineBotLambdaOneclickStack(Stack):
             layers=[line_bot_layer],  # Attach the layer to the Lambda function
             environment={
                 "SECRET_NAME": line_bot_secret.secret_name,
-                "UPLOAD_BUCKET_NAME": file_upload_bucket.bucket_name,
+                "UPLOAD_BUCKET_NAME": bucket_name,
             }
         )
 
@@ -148,6 +179,6 @@ class LineBotLambdaOneclickStack(Stack):
         # Output the S3 bucket name
         CfnOutput(
             self, "FileUploadBucketName",
-            value=file_upload_bucket.bucket_name,
+            value=bucket_name,
             description="S3 bucket for Line Bot file uploads"
         )
