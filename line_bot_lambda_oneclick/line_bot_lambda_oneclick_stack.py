@@ -5,7 +5,9 @@ from aws_cdk import (
     aws_secretsmanager as secretsmanager,
     aws_apigateway as apigw,
     aws_iam as iam,
+    aws_s3 as s3,
     CfnOutput,
+    RemovalPolicy,
     BundlingOptions,
 )
 from constructs import Construct
@@ -41,6 +43,15 @@ class LineBotLambdaOneclickStack(Stack):
             description="Layer containing Line Bot SDK and dependencies",
         )
 
+        # Create S3 bucket for file uploads
+        file_upload_bucket = s3.Bucket(
+            self, "LineBotFileUploadBucket",
+            removal_policy=RemovalPolicy.RETAIN,  # Keep the bucket when stack is deleted
+            encryption=s3.BucketEncryption.S3_MANAGED,  # Enable encryption
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,  # Block public access
+            enforce_ssl=True  # Enforce SSL
+        )
+        
         # Create Lambda function for Line Bot webhook
         line_bot_lambda = _lambda.Function(
             self, "LineBotFunction",
@@ -51,11 +62,15 @@ class LineBotLambdaOneclickStack(Stack):
             layers=[line_bot_layer],  # Attach the layer to the Lambda function
             environment={
                 "SECRET_NAME": line_bot_secret.secret_name,
+                "UPLOAD_BUCKET_NAME": file_upload_bucket.bucket_name,
             }
         )
 
         # Grant Lambda function permission to read the secret
         line_bot_secret.grant_read(line_bot_lambda)
+        
+        # Grant Lambda function permission to write to S3 bucket
+        file_upload_bucket.grant_read_write(line_bot_lambda)
 
         # Create Lambda authorizer for API Gateway
         line_authorizer_lambda = _lambda.Function(
@@ -128,4 +143,11 @@ class LineBotLambdaOneclickStack(Stack):
             self, "SetupInstructions",
             value=f"Update the secret '{line_bot_secret.secret_name}' with your Line Bot credentials",
             description="Instructions for setting up Line Bot credentials"
+        )
+        
+        # Output the S3 bucket name
+        CfnOutput(
+            self, "FileUploadBucketName",
+            value=file_upload_bucket.bucket_name,
+            description="S3 bucket for Line Bot file uploads"
         )

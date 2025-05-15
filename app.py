@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 import os
 
-import aws_cdk as cdk
+from aws_cdk import App, Environment
 
 from line_bot_lambda_oneclick.line_bot_lambda_oneclick_stack import LineBotLambdaOneclickStack
 
 
-app = cdk.App()
+app = App()
 LineBotLambdaOneclickStack(app, "LineBotLambdaOneclickStack",
     # Use the current AWS account and region from the CLI configuration
-    env=cdk.Environment(
+    env=Environment(
         account=os.getenv('CDK_DEFAULT_ACCOUNT'), 
         region=os.getenv('CDK_DEFAULT_REGION')
     ),
